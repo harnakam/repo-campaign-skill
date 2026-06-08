@@ -57,7 +57,10 @@ def bullet_list(values: list[Any], empty: str = "none recorded") -> str:
     lines: list[str] = []
     for value in values:
         if isinstance(value, dict):
-            label = value.get("path") or value.get("name") or value.get("title") or json.dumps(value, sort_keys=True)
+            if value.get("path") and value.get("owner"):
+                label = f"{value.get('path')}: {value.get('owner')} ({value.get('basis', 'owner hint')})"
+            else:
+                label = value.get("path") or value.get("name") or value.get("title") or json.dumps(value, sort_keys=True)
             lines.append(f"- {label}")
         else:
             lines.append(f"- {value}")
@@ -70,6 +73,8 @@ def build_pack(repo: Path, purpose: str | None = None, tail: int = 5) -> str:
     episode = latest_episode(root) or {}
     experience = read_jsonl_tail(root / "experience.jsonl", tail)
     debt = read_jsonl_tail(root / "debt.jsonl", tail)
+    verification = read_jsonl_tail(root / "verification-results.jsonl", tail)
+    copy_diverge = read_jsonl_tail(root / "copy-diverge.jsonl", tail)
 
     lines = [
         "# Repo Campaign Context Pack",
@@ -92,6 +97,9 @@ def build_pack(repo: Path, purpose: str | None = None, tail: int = 5) -> str:
         "Risk zones:",
         bullet_list(repo_map.get("risk_zones", [])),
         "",
+        "Declared or inferred owners:",
+        bullet_list(repo_map.get("declared_owner_files", []) + repo_map.get("inferred_owners", [])),
+        "",
         "Important contracts and entrypoints:",
         bullet_list((repo_map.get("contract_candidates", [])[:20]) + [item.get("path") for item in repo_map.get("entrypoint_candidates", [])[:20] if isinstance(item, dict)]),
         "",
@@ -109,6 +117,12 @@ def build_pack(repo: Path, purpose: str | None = None, tail: int = 5) -> str:
         "",
         "Cleanup debt:",
         bullet_list([record.get("debt") for record in debt]),
+        "",
+        "Verification results already recorded:",
+        bullet_list([f"{record.get('status')}: {record.get('summary')}" for record in verification]),
+        "",
+        "Active copy-and-diverge groups:",
+        bullet_list([f"{record.get('copy_group')}: {record.get('source')} -> {record.get('copy')}" for record in copy_diverge]),
         "",
         "Next verification:",
         bullet_list(episode.get("verification", [])),

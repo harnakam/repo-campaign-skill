@@ -35,7 +35,7 @@ def ensure_state(repo: Path) -> Path:
     root = state_root(repo)
     (root / "episodes").mkdir(parents=True, exist_ok=True)
     (root / "context-packs").mkdir(parents=True, exist_ok=True)
-    for filename in ("experience.jsonl", "debt.jsonl"):
+    for filename in ("experience.jsonl", "debt.jsonl", "verification-results.jsonl", "copy-diverge.jsonl"):
         path = root / filename
         if not path.exists():
             path.write_text("", encoding="utf-8")
@@ -66,7 +66,9 @@ def command_init(args: argparse.Namespace) -> int:
                 "policy": {
                     "experience_path": ".codex/repo-campaign/experience.jsonl",
                     "no_silent_tool_install": True,
+                    "record_verification_results": True,
                     "track_cleanup_debt": True,
+                    "track_copy_and_diverge": True,
                 },
             },
         )
@@ -134,6 +136,39 @@ def append_jsonl(path: Path, record: dict[str, Any]) -> None:
         handle.write(json.dumps(record, sort_keys=True) + "\n")
 
 
+def episode_path(root: Path, episode: int | None) -> Path | None:
+    if episode is None:
+        return None
+    path = root / "episodes" / f"episode-{episode:03d}.json"
+    return path if path.exists() else None
+
+
+def command_record_verification(args: argparse.Namespace) -> int:
+    repo = Path(args.repo)
+    root = ensure_state(repo)
+    record = {
+        "schema_version": 1,
+        "recorded_at": now(),
+        "episode": args.episode,
+        "command": args.command,
+        "status": args.status,
+        "exit_code": args.exit_code,
+        "summary": args.summary,
+        "artifact": args.artifact,
+        "data": read_json_arg(args.data),
+    }
+    append_jsonl(root / "verification-results.jsonl", record)
+
+    path = episode_path(root, args.episode)
+    if path:
+        episode = json.loads(path.read_text(encoding="utf-8"))
+        episode.setdefault("verification_results", [])
+        episode["verification_results"].append(record)
+        episode["updated_at"] = now()
+        write_json(path, episode)
+    return 0
+
+
 def command_append_experience(args: argparse.Namespace) -> int:
     repo = Path(args.repo)
     root = ensure_state(repo)
@@ -167,6 +202,25 @@ def command_append_debt(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_append_copy_diverge(args: argparse.Namespace) -> int:
+    repo = Path(args.repo)
+    root = ensure_state(repo)
+    record = {
+        "schema_version": 1,
+        "recorded_at": now(),
+        "copy_group": args.copy_group,
+        "source": args.source,
+        "copy": args.copy,
+        "reason": args.reason,
+        "allowed_scope": args.allowed_scope,
+        "cleanup_condition": args.cleanup_condition,
+        "cleanup_episode": args.cleanup_episode,
+        "data": read_json_arg(args.data),
+    }
+    append_jsonl(root / "copy-diverge.jsonl", record)
+    return 0
+
+
 def command_status(args: argparse.Namespace) -> int:
     repo = Path(args.repo)
     root = state_root(repo)
@@ -177,10 +231,17 @@ def command_status(args: argparse.Namespace) -> int:
         "episodes": [],
         "experience_records": 0,
         "debt_records": 0,
+        "verification_result_records": 0,
+        "copy_diverge_records": 0,
     }
     if root.exists():
         status["episodes"] = [path.name for path in sorted((root / "episodes").glob("episode-*.json"))]
-        for key, filename in (("experience_records", "experience.jsonl"), ("debt_records", "debt.jsonl")):
+        for key, filename in (
+            ("experience_records", "experience.jsonl"),
+            ("debt_records", "debt.jsonl"),
+            ("verification_result_records", "verification-results.jsonl"),
+            ("copy_diverge_records", "copy-diverge.jsonl"),
+        ):
             path = root / filename
             if path.exists():
                 status[key] = sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
@@ -231,6 +292,17 @@ def build_parser() -> argparse.ArgumentParser:
     experience.add_argument("--data", help="Additional JSON object.")
     experience.set_defaults(func=command_append_experience)
 
+    verification = subparsers.add_parser("record-verification", help="Record a verification result.")
+    verification.add_argument("repo")
+    verification.add_argument("--episode", type=int)
+    verification.add_argument("--command", required=True)
+    verification.add_argument("--status", required=True, choices=["passed", "failed", "skipped", "blocked", "timeout"])
+    verification.add_argument("--exit-code", type=int)
+    verification.add_argument("--summary", required=True)
+    verification.add_argument("--artifact")
+    verification.add_argument("--data", help="Additional JSON object.")
+    verification.set_defaults(func=command_record_verification)
+
     debt = subparsers.add_parser("append-debt", help="Append a cleanup-debt record.")
     debt.add_argument("repo")
     debt.add_argument("--debt", required=True)
@@ -240,6 +312,18 @@ def build_parser() -> argparse.ArgumentParser:
     debt.add_argument("--files", action="append", default=[])
     debt.add_argument("--data", help="Additional JSON object.")
     debt.set_defaults(func=command_append_debt)
+
+    copy_diverge = subparsers.add_parser("append-copy-diverge", help="Append a copy-and-diverge record.")
+    copy_diverge.add_argument("repo")
+    copy_diverge.add_argument("--copy-group", required=True)
+    copy_diverge.add_argument("--source", required=True)
+    copy_diverge.add_argument("--copy", required=True)
+    copy_diverge.add_argument("--reason", required=True)
+    copy_diverge.add_argument("--allowed-scope", action="append", default=[], required=True)
+    copy_diverge.add_argument("--cleanup-condition", required=True)
+    copy_diverge.add_argument("--cleanup-episode", type=int, required=True)
+    copy_diverge.add_argument("--data", help="Additional JSON object.")
+    copy_diverge.set_defaults(func=command_append_copy_diverge)
 
     status = subparsers.add_parser("status", help="Print campaign state status.")
     status.add_argument("repo")

@@ -9,6 +9,7 @@ records. Keep them concise and update them when reality changes.
 Current understanding:
 - Major components:
 - Components touched this episode:
+- Declared or inferred owners:
 - Important connections:
 - Dangerous dependencies:
 - Contracts that must not break:
@@ -31,6 +32,7 @@ Allowed temporary mess:
 Result:
 - Completed:
 - Not completed:
+- Verification results:
 - Surprises:
 - Carryover:
 
@@ -52,7 +54,8 @@ Experience:
   "exit_condition": [
     "repo-map.json exists",
     "risk zones are listed",
-    "next episode is named"
+    "next episode is named",
+    "verification results are recorded"
   ],
   "allowed_mess": ["incomplete component ownership labels"],
   "not_allowed": ["repo-tracked production code edits"],
@@ -71,9 +74,29 @@ Experience:
   "not_done": [],
   "surprises": ["Gradle build logic is in buildSrc"],
   "carryover": ["Map annotation processors in episode 2"],
-  "verification": [
-    {"command": "python scripts/repo_scan.py .", "result": "passed"}
+  "verification_results": [
+    {
+      "command": "python scripts/repo_scan.py .",
+      "status": "passed",
+      "exit_code": 0,
+      "summary": "repo-map.json saved",
+      "artifact": ".codex/repo-campaign/repo-map.json"
+    }
   ]
+}
+```
+
+## Copy And Diverge Record
+
+```json
+{
+  "copy_group": "window-backend-migration",
+  "source": "net.minecraft.client.Minecraft",
+  "copy": "modern.client.MinecraftClient",
+  "reason": "Keep the old client runnable while extracting lifecycle seams",
+  "allowed_scope": ["client bootstrap", "window/input backend internals"],
+  "cleanup_condition": "new bootstrap is default and old bootstrap is no longer needed for comparison",
+  "cleanup_episode": 12
 }
 ```
 
@@ -112,6 +135,9 @@ Relevant files:
 Connections and contracts:
 - ...
 
+Declared or inferred owners:
+- ...
+
 Known landmines:
 - ...
 
@@ -122,5 +148,11 @@ Not allowed:
 - ...
 
 Next verification:
+- ...
+
+Verification results already recorded:
+- ...
+
+Active copy-and-diverge groups:
 - ...
 ```

@@ -12,6 +12,8 @@ campaign state under `.codex/repo-campaign/`.
   "build_systems": ["gradle", "cmake"],
   "languages": {"java": {"files": 1200}, "cpp": {"files": 320}},
   "major_components": ["client", "renderer", "network"],
+  "declared_owner_files": ["CODEOWNERS"],
+  "inferred_owners": [{"path": "renderer", "owner": "alice@example.com"}],
   "modules": [{"name": "client", "path": "client", "kind": "gradle"}],
   "risk_zones": ["native backend", "serialization", "render loop"]
 }
@@ -26,6 +28,7 @@ entrypoints, public APIs, or generated code layout changes.
 {
   "component": "Rendering",
   "owns": ["GameRenderer", "ShaderManager"],
+  "declared_or_inferred_owners": ["alice@example.com", "graphics-team"],
   "depends_on": ["Window", "ResourceManager", "OpenGL"],
   "used_by": ["ClientRuntime"],
   "boundary": "client-runtime",
@@ -34,7 +37,10 @@ entrypoints, public APIs, or generated code layout changes.
 ```
 
 Map components by responsibility before listing files. A directory can contain
-multiple components; a component can span directories.
+multiple components; a component can span directories. Owners can be declared in
+files such as `CODEOWNERS`, inferred from commit history, or inferred from
+module/package boundaries. Mark inference confidence instead of pretending the
+repo has a formal ownership model.
 
 ## Connection
 
@@ -130,7 +136,8 @@ observable behavior relied on by users.
   "exit_condition": [
     "WindowBackend interface exists",
     "Old implementation compiles through the interface",
-    "No public API change"
+    "No public API change",
+    "Verification results are recorded"
   ],
   "allowed_mess": ["temporary adapter", "backend-internal duplication"],
   "not_allowed": ["save format changes", "network protocol changes"]
@@ -139,6 +146,51 @@ observable behavior relied on by users.
 
 Episodes are allowed to end incomplete. If reality invalidates the plan, revise
 the next episode instead of pretending the original plan still fits.
+
+## Episode Result
+
+```json
+{
+  "episode": 3,
+  "completed": false,
+  "done": ["WindowBackend interface exists"],
+  "not_done": ["Input lifecycle still reaches old Display directly"],
+  "verification_results": [
+    {
+      "command": "./gradlew :client:compileJava",
+      "status": "failed",
+      "exit_code": 1,
+      "summary": "184 Display API errors remain",
+      "artifact": ".codex/repo-campaign/error-clusters/display-api.json"
+    }
+  ],
+  "surprises": ["Input initialization owns more window state than expected"],
+  "carryover": ["Separate window/input lifecycle before backend switch"]
+}
+```
+
+An attempted check that is not recorded does not count as campaign knowledge.
+Record failures, skipped checks, timeouts, and environment blockers with the same
+care as passing checks.
+
+## Copy And Diverge
+
+```json
+{
+  "copy_group": "window-backend-migration",
+  "source": "Lwjgl2WindowBackend",
+  "copy": "Lwjgl3WindowBackend",
+  "reason": "Preserve the working LWJGL2 path while developing GLFW lifecycle",
+  "allowed_scope": ["backend internals", "adapter glue"],
+  "cleanup_condition": "LWJGL3 backend is default and fallback removal is approved",
+  "cleanup_episode": 9
+}
+```
+
+Do not treat duplication as failure during migrations. Temporary duplication is
+allowed when it preserves a working old path, creates a safer new path, or
+reveals real differences before abstraction. Every intentional duplicate must
+have source, copy, reason, allowed scope, cleanup condition, and cleanup episode.
 
 ## Cleanup Debt
 

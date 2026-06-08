@@ -7,7 +7,8 @@ import argparse
 import json
 import os
 import re
-from collections import Counter, defaultdict
+import subprocess
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -134,6 +135,12 @@ CONTRACT_PATTERNS = [
 
 ENTRYPOINT_EXTENSIONS = {".java", ".py", ".c", ".cc", ".cpp", ".cxx", ".m", ".mm"}
 MAX_TEXT_READ_BYTES = 80_000
+CODEOWNERS_CANDIDATES = [
+    "CODEOWNERS",
+    ".github/CODEOWNERS",
+    ".gitlab/CODEOWNERS",
+    "docs/CODEOWNERS",
+]
 
 
 def rel(path: Path, root: Path) -> str:
@@ -391,6 +398,81 @@ def detect_major_components(root: Path, files: list[Path]) -> list[str]:
     return [name for name, _ in counts.most_common(30)]
 
 
+def detect_declared_owner_files(root: Path) -> list[str]:
+    return [path for path in CODEOWNERS_CANDIDATES if (root / path).exists()]
+
+
+def parse_codeowners(root: Path) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for relative in detect_declared_owner_files(root):
+        path = root / relative
+        for line_number, line in enumerate(read_text(path).splitlines(), start=1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            parts = stripped.split()
+            if len(parts) < 2:
+                continue
+            entries.append(
+                {
+                    "file": relative,
+                    "line": line_number,
+                    "pattern": parts[0],
+                    "owners": parts[1:],
+                }
+            )
+    return entries[:200]
+
+
+def infer_owners_from_git(root: Path, components: list[str]) -> list[dict[str, Any]]:
+    if not (root / ".git").exists():
+        return []
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "log", "--format=__AUTHOR__%ae", "--name-only", "-n", "300"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if completed.returncode != 0:
+        return []
+
+    component_set = set(components)
+    counts: dict[str, Counter[str]] = {component: Counter() for component in components}
+    current_author: str | None = None
+    for raw_line in completed.stdout.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("__AUTHOR__"):
+            current_author = line.removeprefix("__AUTHOR__").strip() or None
+            continue
+        if not current_author:
+            continue
+        top = line.split("/", 1)[0]
+        if top in component_set:
+            counts[top][current_author] += 1
+
+    inferred: list[dict[str, Any]] = []
+    for component, owner_counts in counts.items():
+        if not owner_counts:
+            continue
+        owner, touches = owner_counts.most_common(1)[0]
+        inferred.append(
+            {
+                "path": component,
+                "owner": owner,
+                "basis": "recent git history",
+                "touches_in_sample": touches,
+                "confidence": "low",
+            }
+        )
+    return inferred
+
+
 def infer_risk_zones(scan: dict[str, Any]) -> list[str]:
     risks: set[str] = set()
     languages = scan.get("languages", {})
@@ -430,6 +512,7 @@ def scan_repo(root: Path) -> dict[str, Any]:
     files, third_party_dirs, generated_dirs = iter_repo_files(root)
     build_systems, build_files = detect_build_systems(root, files)
     languages = detect_languages(files)
+    major_components = detect_major_components(root, files)
     scan: dict[str, Any] = {
         "schema_version": 1,
         "scanned_at": datetime.now(timezone.utc).isoformat(),
@@ -439,7 +522,10 @@ def scan_repo(root: Path) -> dict[str, Any]:
         "build_systems": build_systems,
         "build_files": build_files,
         "languages": languages,
-        "major_components": detect_major_components(root, files),
+        "major_components": major_components,
+        "declared_owner_files": detect_declared_owner_files(root),
+        "declared_owners": parse_codeowners(root),
+        "inferred_owners": infer_owners_from_git(root, major_components),
         "modules": detect_modules(root, files),
         "test_structure": detect_tests(root, files),
         "ci": detect_ci(root),
