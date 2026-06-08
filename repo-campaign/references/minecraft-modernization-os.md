@@ -16,6 +16,30 @@ runtime observability.
 Do not report "Java 25 support" or "LWJGL3 migration" complete unless the
 relevant runtime path is exercised and the verification result is recorded.
 
+## Modernization Modes
+
+Identify the mode before planning runtime or dependency changes:
+
+- `vanilla-modernization`: modernize the client while preserving vanilla behavior.
+- `forge-compatible-modernization`: preserve Forge/mod compatibility as a major
+  public contract.
+- `performance-modernization`: prioritize runtime performance while preserving
+  observable behavior.
+- `toolchain-modernization`: modernize Java, Gradle, CI, and dependency
+  management before runtime architecture.
+- `backend-modernization`: migrate native/window/input/audio/render backend such
+  as LWJGL2 to LWJGL3.
+- `full-platform-migration`: allow larger architectural changes across
+  toolchain, backend, runtime, and compatibility layers.
+
+Do not assume these modes have the same constraints. Forge-compatible
+modernization must treat mod loading, transformers, mappings, public hooks, and
+binary compatibility as contracts unless explicitly relaxed. Backend
+modernization must map lifecycle, native handles, render context, input polling,
+audio devices, and platform-specific behavior before replacement. Toolchain
+modernization must check Gradle, compiler target, annotation processors, bytecode
+tools, CI images, launch wrappers, and test runtime before source-level edits.
+
 ## Internal Specialist Units
 
 ### 1. Architecture Recovery

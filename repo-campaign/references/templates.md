@@ -10,6 +10,7 @@ Current understanding:
 - Major components:
 - Components touched this episode:
 - Declared or inferred owners:
+- Evidence levels:
 - Important connections:
 - Dangerous dependencies:
 - Contracts that must not break:
@@ -29,16 +30,25 @@ This episode will not do:
 Allowed temporary mess:
 - ...
 
+Risk budget:
+- ...
+
+Checkpoint:
+- ...
+
 Result:
 - Completed:
 - Not completed:
 - Verification results:
+- Failure clusters:
 - Surprises:
 - Carryover:
+- Plan changes for the next episode:
 
 Experience:
 - Lessons learned:
 - What to inspect first next time:
+- Plan changes for the next episode:
 ```
 
 ## Episode Plan
@@ -59,6 +69,8 @@ Experience:
   ],
   "allowed_mess": ["incomplete component ownership labels"],
   "not_allowed": ["repo-tracked production code edits"],
+  "risk_budget": ["no production code edits", "optional tools may be missing"],
+  "checkpoint": "current branch before episode",
   "expected_failures": ["optional tools missing"],
   "verification": ["repo_scan.py", "dep_scan.py", "tool_check.py"]
 }
@@ -74,6 +86,7 @@ Experience:
   "not_done": [],
   "surprises": ["Gradle build logic is in buildSrc"],
   "carryover": ["Map annotation processors in episode 2"],
+  "plan_changes_for_next_episode": ["Run dependency scanner before source edits"],
   "verification_results": [
     {
       "command": "python scripts/repo_scan.py .",
@@ -104,11 +117,15 @@ Experience:
 
 ```json
 {
+  "failure_type": "mechanical",
   "error_cluster": "old Display API",
   "count": 184,
-  "example": "cannot find symbol Display",
+  "examples": ["cannot find symbol Display"],
+  "affected_components": ["Window", "Renderer"],
   "meaning": "old window dependency remains outside the backend boundary",
-  "recommended_action": "move Display access behind WindowBackend"
+  "evidence_level": "observed",
+  "recommended_action": "move Display access behind WindowBackend",
+  "fix_kind": "architectural"
 }
 ```
 
@@ -128,6 +145,7 @@ Repo map:
 - Languages:
 - Major components:
 - Risk zones:
+- Evidence gaps:
 
 Relevant files:
 - ...
@@ -147,6 +165,12 @@ Allowed mess:
 Not allowed:
 - ...
 
+Risk budget:
+- ...
+
+Checkpoint:
+- ...
+
 Next verification:
 - ...
 
@@ -154,5 +178,8 @@ Verification results already recorded:
 - ...
 
 Active copy-and-diverge groups:
+- ...
+
+Plan changes for next episode:
 - ...
 ```

@@ -48,7 +48,7 @@ servers.
 ## What To Load
 
 - Load `references/campaign-model.md` when creating or updating repo maps,
-  episodes, debt records, experience records, or context packs.
+  episodes, artifacts, failure clusters, debt records, experience records, or context packs.
 - Load `references/large-scale-engineering-flow.md` when making review, testing,
   compatibility, or large-scale engineering tradeoffs.
 - Load exactly one or more language references when relevant:
@@ -62,6 +62,13 @@ servers.
 
 ## Campaign Rules
 
+- Do not treat inferred architecture as fact. Mark map entries as `observed`,
+  `inferred`, `assumed`, or `unknown`.
+- Prefer source-of-truth in this order when sources disagree: runtime behavior,
+  verification results, build/CI/toolchain configuration, current implementation,
+  recent commit history, documentation, comments, then naming conventions.
+- No component map, no component-internal edits. No lifecycle map, no backend
+  migration. No contract list, no public-facing change.
 - Preserve public contracts unless the episode explicitly includes a migration plan.
 - Distinguish generated, third-party, vendored, and handwritten code before editing.
 - Locate state owners before changing lifecycle or threading behavior.
@@ -75,8 +82,16 @@ servers.
   reveals real differences before abstraction.
 - Track every intentional duplicate with source, copy, reason, allowed scope,
   cleanup condition, and cleanup episode.
+- For Minecraft-like legacy game clients, prefer architecture recovery, lifecycle
+  mapping, and old/new runtime comparison before dependency replacement.
+- State each episode's risk budget before editing. If breakage exceeds it, split
+  the episode, revert the unsafe part, or revise the campaign plan.
+- Before risky changes, create or identify a rollback checkpoint. Record the
+  checkpoint after exit conditions pass.
 - Never report an episode complete until the exit conditions and verification are
-  attempted, and every verification result is recorded.
+  attempted, every verification result is recorded, failures are clustered or
+  deferred, cleanup debt is tracked, experience is updated, and the next context
+  pack is refreshed.
 
 ## Required Output Shape
 
@@ -116,4 +131,5 @@ Result:
 Experience:
 - Lessons learned
 - What to inspect first next time
+- Plan changes for the next episode
 ```

@@ -31,10 +31,10 @@ def read_json(path: Path) -> dict[str, Any] | None:
 
 
 def latest_episode(root: Path) -> dict[str, Any] | None:
-    episodes = sorted((root / "episodes").glob("episode-*.json"))
+    episodes = read_jsonl_tail(root / "episodes.jsonl", 1)
     if not episodes:
         return None
-    return read_json(episodes[-1])
+    return episodes[-1]
 
 
 def read_jsonl_tail(path: Path, limit: int) -> list[dict[str, Any]]:
@@ -73,6 +73,7 @@ def build_pack(repo: Path, purpose: str | None = None, tail: int = 5) -> str:
     episode = latest_episode(root) or {}
     experience = read_jsonl_tail(root / "experience.jsonl", tail)
     debt = read_jsonl_tail(root / "debt.jsonl", tail)
+    failures = read_jsonl_tail(root / "failures.jsonl", tail)
     verification = read_jsonl_tail(root / "verification-results.jsonl", tail)
     copy_diverge = read_jsonl_tail(root / "copy-diverge.jsonl", tail)
 
@@ -90,12 +91,16 @@ def build_pack(repo: Path, purpose: str | None = None, tail: int = 5) -> str:
         f"- Repo kind: {repo_map.get('repo_kind', 'unknown')}",
         f"- Build systems: {', '.join(repo_map.get('build_systems', [])) or 'unknown'}",
         f"- Languages: {', '.join(key for key in repo_map.get('languages', {}).keys() if key != 'extensions') or 'unknown'}",
+        f"- Evidence level: {repo_map.get('evidence_level', 'unknown')}",
         "",
         "Major components:",
         bullet_list(repo_map.get("major_components", [])),
         "",
         "Risk zones:",
         bullet_list(repo_map.get("risk_zones", [])),
+        "",
+        "Evidence gaps:",
+        bullet_list(repo_map.get("evidence_gaps", [])),
         "",
         "Declared or inferred owners:",
         bullet_list(repo_map.get("declared_owner_files", []) + repo_map.get("inferred_owners", [])),
@@ -112,6 +117,15 @@ def build_pack(repo: Path, purpose: str | None = None, tail: int = 5) -> str:
         "Exit conditions:",
         bullet_list(episode.get("exit_condition", [])),
         "",
+        "Risk budget:",
+        bullet_list(episode.get("risk_budget", [])),
+        "",
+        "Checkpoint:",
+        bullet_list([episode.get("checkpoint")] if episode.get("checkpoint") else []),
+        "",
+        "Failure clusters:",
+        bullet_list([f"{record.get('failure_type')}: {record.get('suspected_cause')}" for record in failures]),
+        "",
         "Recent experience:",
         bullet_list([record.get("lesson") or record.get("event") for record in experience]),
         "",
@@ -123,6 +137,9 @@ def build_pack(repo: Path, purpose: str | None = None, tail: int = 5) -> str:
         "",
         "Active copy-and-diverge groups:",
         bullet_list([f"{record.get('copy_group')}: {record.get('source')} -> {record.get('copy')}" for record in copy_diverge]),
+        "",
+        "Plan changes for next episode:",
+        bullet_list([change for record in experience for change in record.get("plan_changes_for_next_episode", [])]),
         "",
         "Next verification:",
         bullet_list(episode.get("verification", [])),
@@ -143,9 +160,8 @@ def main() -> int:
     pack = build_pack(repo, purpose=args.purpose, tail=args.tail)
     if args.write:
         root = state_root(repo)
-        out_dir = root / "context-packs"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_path = out_dir / f"context-pack-{now_slug()}.md"
+        root.mkdir(parents=True, exist_ok=True)
+        out_path = root / "context-pack.md"
         out_path.write_text(pack, encoding="utf-8")
         print(str(out_path))
     else:

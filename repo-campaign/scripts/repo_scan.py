@@ -498,6 +498,21 @@ def infer_risk_zones(scan: dict[str, Any]) -> list[str]:
     return sorted(risks)
 
 
+def infer_evidence_gaps(scan: dict[str, Any]) -> list[str]:
+    gaps: list[str] = []
+    if not scan.get("test_structure", {}).get("test_file_count"):
+        gaps.append("test coverage not found by scanner")
+    if not scan.get("ci"):
+        gaps.append("CI configuration not found by scanner")
+    if not scan.get("declared_owner_files") and not scan.get("inferred_owners"):
+        gaps.append("owners unknown")
+    if not scan.get("entrypoint_candidates"):
+        gaps.append("entrypoints unknown")
+    if not scan.get("contract_candidates"):
+        gaps.append("public contract candidates not identified")
+    return gaps
+
+
 def infer_repo_kind(languages: dict[str, Any], build_systems: list[str]) -> str:
     language_names = [key for key in languages.keys() if key != "extensions"]
     if not language_names and not build_systems:
@@ -534,8 +549,10 @@ def scan_repo(root: Path) -> dict[str, Any]:
         "entrypoint_candidates": detect_entrypoints(root, files),
         "platform_specific_code": detect_platform_specific(root, files),
         "contract_candidates": detect_contracts(root, files),
+        "evidence_level": "observed",
     }
     scan["risk_zones"] = infer_risk_zones(scan)
+    scan["evidence_gaps"] = infer_evidence_gaps(scan)
     return scan
 
 
