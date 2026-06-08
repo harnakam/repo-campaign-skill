@@ -1,0 +1,4 @@
+interface:
+  display_name: "Repo Campaign"
+  short_description: "Plan and run safe large-repo campaigns"
+  default_prompt: "Use $repo-campaign to map this large repository and plan the next migration episode."
